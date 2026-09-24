@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LexiGuard — AI Legal Document Navigator 🛡️
 
-## Getting Started
+**LexiGuard** is a production-quality GenAI web application built with **Next.js App Router**, **TypeScript**, **Tailwind CSS**, **Google Gemini**, and **Supabase Backend (PostgreSQL + pgvector + Storage)**.
 
-First, run the development server:
+Designed with strict legal safety boundaries and document-grounded AI navigation, LexiGuard assists users in analyzing agreements, extracting clauses, asking grounded Q&A, and comparing documents side-by-side.
+
+---
+
+## 🔑 Key Features
+
+1. **AI Document Analysis**: Plain-language summaries, key facts, party obligations, and structured clause extraction.
+2. **Review Radar**: Highlights potential areas requiring attorney review and non-standard risk provisions.
+3. **Document Q&A**: Grounded question-answering with exact source citations and page/chunk references.
+4. **Two-Document Comparison**: Side-by-side analysis of Document A vs Document B highlighting clause variations.
+5. **Actionable Checklist**: Post-execution compliance tasks categorized by target role.
+6. **Supabase Backend & Vector Search**: `pgvector` HNSW index for high-speed similarity search over legal text embeddings.
+7. **Legal Safety Boundaries**: System prompts strictly enforce **NOT an AI lawyer** disclaimers and prohibit claims of legal validity or enforceability.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Lucide Icons
+- **Backend & Database**: Supabase (PostgreSQL, Row Level Security, Storage, `pgvector`)
+- **AI Engine**: Google Gemini (`gemini-3.6-flash`, `text-embedding-004`)
+
+---
+
+## 🚦 Getting Started
+
+### 1. Clone the repository & Install Dependencies
+
+```bash
+git clone https://github.com/BudarajuJaswanth/lexiguard.git
+cd lexiguard
+npm install
+```
+
+### 2. Configure Environment Variables
+
+Create `.env.local` in the project root:
+
+```env
+# PUBLIC CLIENT VARIABLES
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# SERVER-ONLY SECRETS
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+GEMINI_API_KEY=your-gemini-api-key
+```
+
+### 3. Run Database Migrations
+
+Apply the migration script under [`supabase/migrations/20260924000000_init_lexiguard.sql`](./supabase/migrations/20260924000000_init_lexiguard.sql) in your Supabase SQL Editor to initialize tables, `pgvector`, RLS policies, and the `documents` storage bucket.
+
+### 4. Run the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view LexiGuard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## ⚠️ Legal Notice
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> **LexiGuard provides general informational assistance and document navigation. It does not provide legal advice or determine whether a provision is legally valid.** Consider discussing identified provisions with a qualified legal professional.
