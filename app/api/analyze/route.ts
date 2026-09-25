@@ -111,8 +111,18 @@ export async function POST(req: NextRequest) {
           ...c,
           risk_level: c.risk_level || 'medium',
         })),
-        review_radar: geminiResult.reviewAreas.map(r => ({
-          ...r,
+        review_radar: geminiResult.reviewAreas.map((r: any) => ({
+          title: r.title || r.category || 'Provision for Review',
+          description: r.description || '',
+          reason: r.reason || r.impact || 'May require closer review and clarification with legal counsel.',
+          category: (r.category === 'HIGHER ATTENTION' || r.category === 'WORTH REVIEWING' || r.category === 'INFORMATIONAL')
+            ? r.category
+            : (r.severity === 'critical' ? 'HIGHER ATTENTION' : r.severity === 'info' ? 'INFORMATIONAL' : 'WORTH REVIEWING'),
+          source_section: r.source_section || 'Document Provision',
+          page_number: r.page_number || null,
+          original_clause: r.original_clause || r.description || '',
+          explanation: r.explanation || r.description || '',
+          impact: r.impact || r.reason,
           severity: r.severity || 'warning',
         })),
         questions_to_consider: geminiResult.questionsForProfessional,

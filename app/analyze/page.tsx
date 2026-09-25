@@ -5,10 +5,11 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import ReviewRadarModal from '@/components/ReviewRadarModal';
 import { Badge } from '@/components/Badge';
 import { LoadingState, ErrorState, EmptyState } from '@/components/StateHandlers';
 import { getDocuments, getAnalysisByDocumentId } from '@/lib/supabase';
-import { LegalDocument, AnalysisData } from '@/types';
+import { LegalDocument, AnalysisData, ReviewRadarItem } from '@/types';
 import { 
   FileText, 
   BarChart3, 
@@ -50,6 +51,15 @@ function AnalysisContent() {
   const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
   const [analyzingGemini, setAnalyzingGemini] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // Review Radar Modal State
+  const [activeRadarItem, setActiveRadarItem] = useState<ReviewRadarItem | null>(null);
+  const [isRadarModalOpen, setIsRadarModalOpen] = useState<boolean>(false);
+
+  const handleOpenRadarModal = (item: ReviewRadarItem) => {
+    setActiveRadarItem(item);
+    setIsRadarModalOpen(true);
+  };
 
   // Load all documents for dropdown selector
   useEffect(() => {
@@ -501,34 +511,94 @@ function AnalysisContent() {
               </section>
 
               {/* 5. Review Radar */}
-              <section className="bg-slate-900 text-slate-100 rounded-xl border border-slate-800 p-6 shadow-sm">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-                  <h2 className="text-base font-bold text-white flex items-center space-x-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-400" />
-                    <span>Review Radar</span>
-                  </h2>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 bg-amber-950 px-2 py-0.5 rounded border border-amber-800/80">
-                    Potential Areas Requiring Review
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  {analysis.review_radar?.map((item, idx) => (
-                    <div key={idx} className="p-4 bg-slate-950 rounded-lg border border-slate-800 flex items-start space-x-3">
-                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold text-xs text-white">{item.category}</span>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-mono">
-                            [{item.severity}]
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-300 mt-1 leading-relaxed">{item.description}</p>
-                        <p className="text-[11px] text-amber-200 mt-2 font-medium">
-                          <strong>Potential Impact:</strong> {item.impact}
-                        </p>
-                      </div>
+              <section className="bg-slate-900 text-slate-100 rounded-xl border border-slate-800 p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-2">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                    <div>
+                      <h2 className="text-base font-bold text-white tracking-tight">
+                        Review Radar
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        Provisions deserving review derived dynamically from Gemini AI analysis. Click any item to inspect source clause.
+                      </p>
                     </div>
-                  ))}
+                  </div>
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <Badge type="AI_ANALYSIS" />
+                    <Badge type="GENERATED_BY_GEMINI" />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {analysis.review_radar?.map((item, idx) => {
+                    const catUpper = (item.category || '').toUpperCase();
+                    const isHigher = catUpper === 'HIGHER ATTENTION' || catUpper === 'CRITICAL' || catUpper === 'HIGH';
+                    const isInfo = catUpper === 'INFORMATIONAL' || catUpper === 'INFO' || catUpper === 'LOW';
+
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => handleOpenRadarModal(item)}
+                        className={`p-4 rounded-xl border transition-all cursor-pointer group hover:scale-[1.005] ${
+                          isHigher
+                            ? 'bg-slate-950/90 border-red-900/60 hover:border-red-600'
+                            : isInfo
+                            ? 'bg-slate-950/90 border-slate-800 hover:border-slate-600'
+                            : 'bg-slate-950/90 border-amber-900/60 hover:border-amber-600'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1.5 flex-1">
+                            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                              {/* Category Badge */}
+                              {isHigher ? (
+                                <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-red-950 text-red-300 border border-red-800 rounded">
+                                  HIGHER ATTENTION
+                                </span>
+                              ) : isInfo ? (
+                                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700 rounded">
+                                  INFORMATIONAL
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-950 text-amber-300 border border-amber-800 rounded">
+                                  WORTH REVIEWING
+                                </span>
+                              )}
+
+                              <h3 className="font-bold text-xs text-white group-hover:text-blue-300 transition-colors">
+                                {item.title || item.category}
+                              </h3>
+                            </div>
+
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                              {item.description}
+                            </p>
+
+                            {/* Why It May Matter */}
+                            <p className="text-[11px] text-amber-200/90 font-medium pt-1">
+                              <strong>Why It May Matter:</strong> {item.reason || item.impact}
+                            </p>
+                          </div>
+
+                          {/* Source Tag & Link Indicator */}
+                          <div className="text-right shrink-0 space-y-1">
+                            <span className="text-[10px] font-mono font-semibold text-slate-400 bg-slate-800 px-2 py-1 rounded block">
+                              {item.source_section || 'Section'}
+                            </span>
+                            {item.page_number && (
+                              <span className="text-[10px] font-mono text-slate-500 block">
+                                Page {item.page_number}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity block font-semibold">
+                              View Clause →
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
 
@@ -579,6 +649,13 @@ function AnalysisContent() {
         </div>
 
       </div>
+
+      {/* Review Radar Clause Link Modal */}
+      <ReviewRadarModal
+        item={activeRadarItem}
+        isOpen={isRadarModalOpen}
+        onClose={() => setIsRadarModalOpen(false)}
+      />
     </>
   );
 }

@@ -17,10 +17,14 @@ export interface GeminiStructuredAnalysis {
     risk_level: 'low' | 'medium' | 'high';
   }[];
   reviewAreas: {
-    category: string;
+    title: string;
     description: string;
-    impact: string;
-    severity: 'info' | 'warning' | 'critical';
+    reason: string;
+    category: 'HIGHER ATTENTION' | 'WORTH REVIEWING' | 'INFORMATIONAL';
+    source_section: string;
+    page_number?: number | string | null;
+    original_clause: string;
+    explanation: string;
   }[];
   unclearInformation: string[];
   questionsForProfessional: string[];
@@ -47,7 +51,14 @@ Do not determine whether any provision is legally valid or enforceable.
 
 Do not state that a clause is illegal.
 
-When identifying potential concerns, use language such as:
+Do not create a overall legal validity score or state "This contract is risky". Focus on individual document provisions.
+
+For reviewAreas, categorize items strictly into one of three categories:
+- 'HIGHER ATTENTION' (Provisions requiring careful review like non-compete, broad indemnities, unlimited liability, automatic renewal)
+- 'WORTH REVIEWING' (Standard clauses with specific scope or notice requirements like termination terms, governing law, IP assignment)
+- 'INFORMATIONAL' (Standard boilerplate provisions like notices, severability, entire agreement)
+
+When identifying potential concerns, use neutral, factual language such as:
 - 'may require closer review'
 - 'may warrant clarification'
 - 'consider discussing this with a qualified legal professional.'
@@ -118,10 +129,14 @@ Generate a JSON object strictly following this structure:
   ],
   "reviewAreas": [
     {
-      "category": "Asymmetrical Indemnification",
-      "description": "Description of provision that may require closer review",
-      "impact": "Consider discussing this with a qualified legal professional.",
-      "severity": "warning"
+      "title": "Title of provision warranting attention",
+      "description": "The agreement contains a specific restrictive covenant or obligation.",
+      "reason": "Why it may matter (e.g. may limit post-employment options or impose unilateral liability)",
+      "category": "HIGHER ATTENTION",
+      "source_section": "Section 11 — Restrictive Covenants",
+      "page_number": "3",
+      "original_clause": "Verbatim text quote of the clause from the document text",
+      "explanation": "Plain language explanation of what this clause means"
     }
   ],
   "unclearInformation": [

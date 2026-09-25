@@ -24,6 +24,7 @@ export interface LegalDocument {
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 export type SeverityLevel = 'info' | 'warning' | 'critical';
+export type ReviewCategory = 'HIGHER ATTENTION' | 'WORTH REVIEWING' | 'INFORMATIONAL';
 
 export interface ImportantClause {
   title: string;
@@ -34,10 +35,17 @@ export interface ImportantClause {
 }
 
 export interface ReviewRadarItem {
-  category: string;
+  title: string;
   description: string;
-  impact: string;
-  severity: SeverityLevel;
+  reason: string;
+  category: ReviewCategory | string;
+  source_section: string;
+  page_number?: number | string | null;
+  original_clause: string;
+  explanation: string;
+  // Legacy backward-compatibility optional fields
+  impact?: string;
+  severity?: SeverityLevel | string;
 }
 
 export interface ActionChecklistItem {
