@@ -602,44 +602,92 @@ function AnalysisContent() {
                 </div>
               </section>
 
-              {/* 6. Questions to Consider */}
-              <section className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2 pb-3 border-b border-slate-200 mb-4">
-                  <HelpCircle className="w-4 h-4 text-blue-600" />
-                  <span>Questions to Consider</span>
-                </h2>
-                <ul className="space-y-2">
+              {/* 6. QUESTIONS TO CONSIDER */}
+              <section className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
+                  <div className="flex items-center space-x-2">
+                    <HelpCircle className="w-5 h-5 text-blue-600 shrink-0" />
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                        QUESTIONS TO CONSIDER
+                      </h2>
+                      <p className="text-[11px] text-slate-500">
+                        Targeted questions derived specifically from clauses found in the uploaded document.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 shrink-0 flex-wrap gap-y-1">
+                    <Badge type="GENERATED_BY_GEMINI" />
+                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                      Based on uploaded document
+                    </span>
+                  </div>
+                </div>
+
+                <ul className="space-y-2.5">
                   {analysis.questions_to_consider?.map((q, idx) => (
-                    <li key={idx} className="p-3 bg-blue-50/50 rounded-lg border border-blue-100 text-xs text-slate-800 flex items-start space-x-2">
-                      <span className="font-bold text-blue-600 text-xs">Q{idx + 1}.</span>
-                      <span className="leading-relaxed">{q}</span>
+                    <li key={idx} className="p-3.5 bg-blue-50/50 rounded-lg border border-blue-100 text-xs text-slate-800 flex items-start space-x-3">
+                      <span className="font-bold text-blue-600 text-xs shrink-0 mt-0.5">Q{idx + 1}.</span>
+                      <div className="space-y-1 flex-1">
+                        <p className="leading-relaxed font-medium text-slate-900">{q}</p>
+                        <p className="text-[10px] text-slate-500 italic">
+                          Consider discussing this with a qualified legal professional if clarification is needed.
+                        </p>
+                      </div>
                     </li>
                   ))}
                 </ul>
+
+                <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400">
+                  Informational assistance — not legal advice.
+                </div>
               </section>
 
-              {/* 7. Action Checklist */}
-              <section className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2 pb-3 border-b border-slate-200 mb-4">
-                  <CheckSquare className="w-4 h-4 text-emerald-600" />
-                  <span>Action Checklist</span>
-                </h2>
-                <div className="space-y-2">
-                  {analysis.action_checklist?.map((item) => (
-                    <div key={item.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
-                      <div className="flex items-center space-x-3">
+              {/* 7. DOCUMENT CHECKLIST */}
+              <section className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
+                  <div className="flex items-center space-x-2">
+                    <CheckSquare className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                        DOCUMENT CHECKLIST
+                      </h2>
+                      <p className="text-[11px] text-slate-500">
+                        Actionable document review items generated from AI document analysis.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 shrink-0 flex-wrap gap-y-1">
+                    <Badge type="GENERATED_BY_GEMINI" />
+                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                      Based on uploaded document
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {analysis.action_checklist?.map((item, idx) => (
+                    <div 
+                      key={item.id || idx} 
+                      className="p-3.5 bg-slate-50 hover:bg-slate-100/70 rounded-lg border border-slate-200 flex items-center justify-between text-xs transition-colors cursor-pointer"
+                    >
+                      <label className="flex items-center space-x-3 cursor-pointer flex-1">
                         <input
                           type="checkbox"
                           defaultChecked={item.completed}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4 shrink-0"
                         />
-                        <span className="font-medium text-slate-900">{item.task}</span>
-                      </div>
-                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-200 px-2 py-0.5 rounded font-mono uppercase">
-                        Target: {item.target_role}
+                        <span className="font-semibold text-slate-900">{item.task}</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-2.5 py-1 rounded font-mono uppercase shrink-0 ml-3">
+                        Target: {item.target_role || 'Legal Counsel'}
                       </span>
                     </div>
                   ))}
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400">
+                  Informational assistance — not legal advice.
                 </div>
               </section>
 

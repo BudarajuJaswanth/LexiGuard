@@ -58,10 +58,13 @@ For reviewAreas, categorize items strictly into one of three categories:
 - 'WORTH REVIEWING' (Standard clauses with specific scope or notice requirements like termination terms, governing law, IP assignment)
 - 'INFORMATIONAL' (Standard boilerplate provisions like notices, severability, entire agreement)
 
-When identifying potential concerns, use neutral, factual language such as:
-- 'may require closer review'
-- 'may warrant clarification'
-- 'consider discussing this with a qualified legal professional.'
+For questionsForProfessional (Questions to Consider):
+- Generate targeted questions based specifically on clauses found in the uploaded document text.
+- Use informational phrasing such as: "Questions to consider", "May require clarification", "Consider discussing with a qualified legal professional".
+- STRICTLY PROHIBIT directive imperatives such as: "You must...", "You should definitely...", "This is illegal...", "Sign this...", "Do not sign this...".
+
+For checklist (Document Checklist):
+- Generate relevant document review items based on document provisions (e.g. Verify parties, Verify dates, Review termination conditions, Review notice period, Review confidentiality, Review intellectual property, Clarify unclear provisions).
 
 Never invent information that is absent from the supplied document.
 
@@ -143,14 +146,33 @@ Generate a JSON object strictly following this structure:
     "Any ambiguous term or omitted attachment that may warrant clarification"
   ],
   "questionsForProfessional": [
-    "Targeted question 1 to ask legal counsel regarding liabilities",
-    "Targeted question 2 to ask legal counsel regarding termination notice"
+    "Can you clarify the scope of the termination notice provision?",
+    "What activities are covered by the restrictive covenant in Section 11?",
+    "Does the confidentiality obligation continue after termination of the agreement?"
   ],
   "checklist": [
     {
       "id": "task-1",
-      "task": "Compliance task to fulfill post-execution",
-      "target_role": "Legal Counsel / Operations",
+      "task": "Verify parties and effective dates",
+      "target_role": "Operations",
+      "completed": false
+    },
+    {
+      "id": "task-2",
+      "task": "Review termination conditions and notice period",
+      "target_role": "Legal Counsel",
+      "completed": false
+    },
+    {
+      "id": "task-3",
+      "task": "Review confidentiality and intellectual property terms",
+      "target_role": "Legal Counsel",
+      "completed": false
+    },
+    {
+      "id": "task-4",
+      "task": "Clarify unclear provisions with legal counsel",
+      "target_role": "Legal Counsel",
       "completed": false
     }
   ]
