@@ -8,7 +8,7 @@ import { Badge } from '@/components/Badge';
 import { LoadingState, ErrorState, EmptyState } from '@/components/StateHandlers';
 import { getDocuments, isSupabaseConfigured } from '@/lib/supabase';
 import { LegalDocument } from '@/types';
-import { FileSearch, GitCompare, Plus, FileText, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { FileSearch, GitCompare, FileText, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export default function DashboardPage() {
   const [documents, setDocuments] = useState<LegalDocument[] | null>(null);
@@ -31,6 +31,20 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDocs();
   }, []);
+
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'uploaded': return <Badge type="STATUS_UPLOADED" />;
+      case 'extracting': return <Badge type="STATUS_EXTRACTING" />;
+      case 'chunking': return <Badge type="STATUS_CHUNKING" />;
+      case 'embedding': return <Badge type="STATUS_EMBEDDING" />;
+      case 'ready': return <Badge type="STATUS_READY" />;
+      case 'analyzing': return <Badge type="STATUS_ANALYZING" />;
+      case 'completed': return <Badge type="STATUS_COMPLETED" />;
+      case 'failed': return <Badge type="STATUS_FAILED" />;
+      default: return <Badge type="STATUS_READY" />;
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
@@ -77,7 +91,7 @@ export default function DashboardPage() {
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <strong className="font-semibold block mb-0.5">Supabase Backend Configuration Needed</strong>
-              Supabase environment variables (<code className="font-mono bg-amber-100 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>) are currently placeholders in <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">.env</code>. Once populated, documents will persist live in Supabase.
+              Supabase environment variables (<code className="font-mono bg-amber-100 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>) are currently placeholders in <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">.env.local</code>.
             </div>
           </div>
         )}
@@ -153,16 +167,13 @@ export default function DashboardPage() {
                           {(doc.file_size / 1024).toFixed(1)} KB
                         </td>
                         <td className="px-4 py-3">
-                          {doc.status === 'processing' && <Badge type="STATUS_PROCESSING" />}
-                          {doc.status === 'analyzed' && <Badge type="STATUS_ANALYZED" />}
-                          {doc.status === 'uploaded' && <Badge type="STATUS_UPLOADED" />}
-                          {doc.status === 'error' && <Badge type="STATUS_ERROR" />}
+                          {renderStatusBadge(doc.status)}
                         </td>
                         <td className="px-4 py-3 font-semibold text-slate-700">
-                          {doc.status === 'analyzed' ? (
-                            <span className="text-emerald-700 font-medium text-[11px]">Analysis Available</span>
+                          {doc.status === 'ready' || doc.status === 'completed' ? (
+                            <span className="text-emerald-700 font-medium text-[11px]">Ready for AI</span>
                           ) : (
-                            <span className="text-slate-400 font-normal text-[11px]">Pending Analysis</span>
+                            <span className="text-slate-400 font-normal text-[11px]">Processing</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right space-x-2">

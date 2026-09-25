@@ -1,9 +1,19 @@
-export type DocumentStatus = 'uploaded' | 'processing' | 'analyzed' | 'error';
+export type DocumentStatus = 
+  | 'uploaded'
+  | 'extracting'
+  | 'chunking'
+  | 'embedding'
+  | 'ready'
+  | 'analyzing'
+  | 'completed'
+  | 'failed';
 
 export interface LegalDocument {
   id: string;
+  user_id?: string;
   name: string;
-  file_path: string;
+  file_path?: string;
+  file_url?: string;
   file_size: number;
   file_type: string;
   status: DocumentStatus;

@@ -8,10 +8,14 @@ type BadgeType =
   | 'HIGH_RISK'
   | 'MEDIUM_RISK'
   | 'LOW_RISK'
-  | 'STATUS_PROCESSING'
-  | 'STATUS_ANALYZED'
   | 'STATUS_UPLOADED'
-  | 'STATUS_ERROR';
+  | 'STATUS_EXTRACTING'
+  | 'STATUS_CHUNKING'
+  | 'STATUS_EMBEDDING'
+  | 'STATUS_READY'
+  | 'STATUS_ANALYZING'
+  | 'STATUS_COMPLETED'
+  | 'STATUS_FAILED';
 
 interface BadgeProps {
   type: BadgeType;
@@ -76,22 +80,6 @@ export function Badge({ type, customText, size = 'sm' }: BadgeProps) {
         </span>
       );
 
-    case 'STATUS_PROCESSING':
-      return (
-        <span className={`inline-flex items-center font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 ${sizeClasses}`}>
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 animate-spin"></span>
-          Processing...
-        </span>
-      );
-
-    case 'STATUS_ANALYZED':
-      return (
-        <span className={`inline-flex items-center font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 ${sizeClasses}`}>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
-          Analyzed
-        </span>
-      );
-
     case 'STATUS_UPLOADED':
       return (
         <span className={`inline-flex items-center font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200 ${sizeClasses}`}>
@@ -99,10 +87,57 @@ export function Badge({ type, customText, size = 'sm' }: BadgeProps) {
         </span>
       );
 
-    case 'STATUS_ERROR':
+    case 'STATUS_EXTRACTING':
+      return (
+        <span className={`inline-flex items-center font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 ${sizeClasses}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5 animate-pulse"></span>
+          Extracting...
+        </span>
+      );
+
+    case 'STATUS_CHUNKING':
+      return (
+        <span className={`inline-flex items-center font-medium rounded-full bg-purple-50 text-purple-700 border border-purple-200 ${sizeClasses}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5 animate-pulse"></span>
+          Chunking...
+        </span>
+      );
+
+    case 'STATUS_EMBEDDING':
+      return (
+        <span className={`inline-flex items-center font-medium rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 ${sizeClasses}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 mr-1.5 animate-pulse"></span>
+          Embedding...
+        </span>
+      );
+
+    case 'STATUS_READY':
+      return (
+        <span className={`inline-flex items-center font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 ${sizeClasses}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
+          Ready
+        </span>
+      );
+
+    case 'STATUS_ANALYZING':
+      return (
+        <span className={`inline-flex items-center font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 ${sizeClasses}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 animate-spin"></span>
+          Analyzing...
+        </span>
+      );
+
+    case 'STATUS_COMPLETED':
+      return (
+        <span className={`inline-flex items-center font-medium rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 ${sizeClasses}`}>
+          Completed
+        </span>
+      );
+
+    case 'STATUS_FAILED':
       return (
         <span className={`inline-flex items-center font-medium rounded-full bg-red-50 text-red-700 border border-red-200 ${sizeClasses}`}>
-          Error
+          Failed
         </span>
       );
 

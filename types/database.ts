@@ -6,7 +6,16 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type DocumentStatus = 'uploaded' | 'processing' | 'analyzed' | 'error';
+export type DocumentStatus = 
+  | 'uploaded'
+  | 'extracting'
+  | 'chunking'
+  | 'embedding'
+  | 'ready'
+  | 'analyzing'
+  | 'completed'
+  | 'failed';
+
 export type MessageRole = 'user' | 'assistant' | 'system';
 
 export interface Database {

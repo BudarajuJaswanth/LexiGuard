@@ -21,8 +21,17 @@ import {
   Layers, 
   CheckCircle2,
   Clock,
-  Sparkles
+  Sparkles,
+  Layers3
 } from 'lucide-react';
+
+interface ExtractedChunkItem {
+  id: string;
+  content: string;
+  chunk_index: number;
+  section?: string | null;
+  page_number?: number | null;
+}
 
 function AnalysisContent() {
   const searchParams = useSearchParams();
@@ -33,6 +42,7 @@ function AnalysisContent() {
   const [selectedDoc, setSelectedDoc] = useState<LegalDocument | null>(null);
 
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
+  const [chunks, setChunks] = useState<ExtractedChunkItem[]>([]);
   const [loadingDocs, setLoadingDocs] = useState<boolean>(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
@@ -59,27 +69,57 @@ function AnalysisContent() {
     loadDocs();
   }, []);
 
-  // Fetch analysis when selectedDocId changes
+  // Fetch analysis & chunks when selectedDocId changes
   useEffect(() => {
     if (!selectedDocId) return;
     const docMatch = documents.find(d => d.id === selectedDocId);
     if (docMatch) setSelectedDoc(docMatch);
 
-    const loadAnalysis = async () => {
+    const loadAnalysisAndChunks = async () => {
       setLoadingAnalysis(true);
       setError(null);
-      const { data, error: err } = await getAnalysisByDocumentId(selectedDocId);
+      
+      // Fetch analysis
+      const { data: analysisData, error: err } = await getAnalysisByDocumentId(selectedDocId);
       if (err) {
         setError(err);
         setAnalysis(null);
       } else {
-        setAnalysis(data);
+        setAnalysis(analysisData);
       }
+
+      // Fetch extracted chunks from API route
+      try {
+        const res = await fetch(`/api/documents/${selectedDocId}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.chunks) {
+            setChunks(json.chunks);
+          }
+        }
+      } catch (cErr) {
+        console.error('Failed to fetch extracted chunks:', cErr);
+      }
+
       setLoadingAnalysis(false);
     };
 
-    loadAnalysis();
+    loadAnalysisAndChunks();
   }, [selectedDocId, documents]);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'uploaded': return <Badge type="STATUS_UPLOADED" />;
+      case 'extracting': return <Badge type="STATUS_EXTRACTING" />;
+      case 'chunking': return <Badge type="STATUS_CHUNKING" />;
+      case 'embedding': return <Badge type="STATUS_EMBEDDING" />;
+      case 'ready': return <Badge type="STATUS_READY" />;
+      case 'analyzing': return <Badge type="STATUS_ANALYZING" />;
+      case 'completed': return <Badge type="STATUS_COMPLETED" />;
+      case 'failed': return <Badge type="STATUS_FAILED" />;
+      default: return <Badge type="STATUS_READY" />;
+    }
+  };
 
   return (
     <>
@@ -177,11 +217,11 @@ function AnalysisContent() {
                 <div className="space-y-2 text-slate-600">
                   <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
                     <span>Status</span>
-                    <Badge type="STATUS_ANALYZED" />
+                    {getStatusBadge(selectedDoc.status)}
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
-                    <span>Storage Path</span>
-                    <span className="font-mono text-[10px] text-slate-500 truncate max-w-[150px]">{selectedDoc.file_path}</span>
+                    <span>Extracted Chunks</span>
+                    <span className="font-mono text-[11px] font-bold text-slate-800">{chunks.length} clauses</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5">
                     <span>Uploaded Date</span>
@@ -189,7 +229,7 @@ function AnalysisContent() {
                   </div>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-2 space-y-2">
                   <Link
                     href={`/ask?doc=${selectedDoc.id}`}
                     className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-xs transition-colors flex items-center justify-center space-x-1.5 shadow-sm"
@@ -203,6 +243,28 @@ function AnalysisContent() {
               <p className="text-xs text-slate-500 italic">No document selected.</p>
             )}
           </div>
+
+          {/* Extracted Chunks Preview Box */}
+          {chunks.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center space-x-1.5">
+                <Layers3 className="w-4 h-4 text-purple-600" />
+                <span>Extracted Legal Chunks ({chunks.length})</span>
+              </h3>
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {chunks.slice(0, 5).map((chunk, cIdx) => (
+                  <div key={chunk.id} className="p-2.5 bg-slate-50 rounded border border-slate-200 text-[11px]">
+                    <span className="font-bold text-slate-800 text-[10px] uppercase font-mono block mb-1">
+                      Chunk #{chunk.chunk_index + 1} — {chunk.section || 'Provision'}
+                    </span>
+                    <p className="text-slate-600 line-clamp-2 font-mono text-[10px]">
+                      {chunk.content}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Document Grounding Principles Card */}
           <div className="bg-slate-900 text-slate-200 rounded-xl border border-slate-800 p-5 text-xs space-y-3">
@@ -233,20 +295,49 @@ function AnalysisContent() {
           {/* Loading Analysis */}
           {loadingAnalysis && (
             <LoadingState
-              message="Fetching analysis from Supabase..."
-              subtext="Reading AI structured output records from `analyses` table"
+              message="Fetching analysis & chunks from Supabase..."
+              subtext="Reading document chunks and structured analysis records"
             />
           )}
 
-          {/* Empty State when document not analyzed yet */}
-          {!loadingAnalysis && !analysis && (
-            <EmptyState
-              title="Document Analysis Pending"
-              description="This document has been registered in Supabase. The GenAI pipeline will process and populate the 7 structured sections once triggered."
-              actionLabel="Trigger AI Pipeline"
-              onAction={() => alert('GenAI backend pipeline is ready for Gemini execution in the next integration phase.')}
-              icon={BarChart3}
-            />
+          {/* Extracted Chunks Status Banner if Analysis is Pending */}
+          {!loadingAnalysis && !analysis && selectedDoc && (
+            <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-base font-bold text-slate-900">Document Processed & Ready for AI Analysis</h2>
+                </div>
+                {getStatusBadge(selectedDoc.status)}
+              </div>
+
+              <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs space-y-1.5">
+                <div className="flex items-center space-x-2 font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Real Document Successfully Uploaded & Parsed</span>
+                </div>
+                <p className="text-emerald-800">
+                  Document <strong className="font-semibold">{selectedDoc.name}</strong> was stored in Supabase Storage and parsed into <strong>{chunks.length} structured text chunks</strong> in database table <code className="font-mono bg-emerald-100 px-1 py-0.5 rounded">document_chunks</code>.
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Extracted Source Chunks Preview:</h3>
+                <div className="space-y-3">
+                  {chunks.map((chunk) => (
+                    <div key={chunk.id} className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+                      <div className="flex items-center justify-between mb-1.5 font-mono text-[11px]">
+                        <span className="font-bold text-slate-800">Chunk #{chunk.chunk_index + 1}: {chunk.section}</span>
+                        <span className="text-slate-400">Page {chunk.page_number || 1}</span>
+                      </div>
+                      <p className="text-slate-700 font-mono text-[11px] leading-relaxed bg-white p-2.5 rounded border border-slate-200">
+                        {chunk.content}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Structured Analysis View */}
