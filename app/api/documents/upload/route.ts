@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { processAndStoreDocument } from '@/lib/documentProcessor';
+import { processStorageDocument } from '@/lib/documentProcessor';
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 const ALLOWED_EXTENSIONS = ['pdf', 'docx'];
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     const cleanFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
     const storagePath = `user_documents/${cleanFileName}`;
 
-    // 3. Upload to Supabase Storage bucket 'documents'
+    // 3. Upload raw document file to Supabase Storage bucket 'documents'
     const { error: storageErr } = await adminSupabase
       .storage
       .from('documents')
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const { data: urlData } = adminSupabase.storage.from('documents').getPublicUrl(storagePath);
     const fileUrl = urlData?.publicUrl || storagePath;
 
-    // Default user ID for hackathon session
+    // Default user ID for session
     const defaultUserId = '00000000-0000-0000-0000-000000000000';
 
     // 4. Create row in Supabase DB 'documents' table
@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
         file_type: ext.toUpperCase(),
         file_size: file.size,
         status: 'uploaded',
+        error_message: null,
       }])
       .select()
       .single();
@@ -97,18 +98,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Run Server Text Extraction & Chunking
-    const processResult = await processAndStoreDocument(docRecord.id, buffer, ext);
+    // 5. Run Server Processing Pipeline (Download from Storage -> Page/Section Extraction -> Semantic Legal Chunking -> Save Chunks)
+    const processResult = await processStorageDocument(docRecord.id, storagePath, ext);
 
     return NextResponse.json({
-      success: true,
+      success: processResult.success,
       documentId: docRecord.id,
       document: {
         ...docRecord,
         status: processResult.success ? 'ready' : 'failed',
+        error_message: processResult.error || null,
       },
       chunkCount: processResult.chunkCount,
-      message: 'Document uploaded and processed successfully.',
+      error: processResult.error || null,
+      message: processResult.success 
+        ? 'Document uploaded, retrieved, and processed successfully into document_chunks.'
+        : processResult.error || 'Failed to process document text',
     });
 
   } catch (err: any) {

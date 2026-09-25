@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
-  Layers3
+  Layers3,
+  AlertCircle
 } from 'lucide-react';
 
 interface ExtractedChunkItem {
@@ -93,8 +94,13 @@ function AnalysisContent() {
         const res = await fetch(`/api/documents/${selectedDocId}`);
         if (res.ok) {
           const json = await res.json();
-          if (json.success && json.chunks) {
-            setChunks(json.chunks);
+          if (json.success) {
+            if (json.document) {
+              setSelectedDoc(json.document);
+            }
+            if (json.chunks) {
+              setChunks(json.chunks);
+            }
           }
         }
       } catch (cErr) {
@@ -252,11 +258,12 @@ function AnalysisContent() {
                 <span>Extracted Legal Chunks ({chunks.length})</span>
               </h3>
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {chunks.slice(0, 5).map((chunk, cIdx) => (
+                {chunks.slice(0, 5).map((chunk) => (
                   <div key={chunk.id} className="p-2.5 bg-slate-50 rounded border border-slate-200 text-[11px]">
-                    <span className="font-bold text-slate-800 text-[10px] uppercase font-mono block mb-1">
-                      Chunk #{chunk.chunk_index + 1} — {chunk.section || 'Provision'}
-                    </span>
+                    <div className="flex justify-between font-mono text-[10px] text-slate-800 mb-1">
+                      <span className="font-bold">Chunk #{chunk.chunk_index + 1} • {chunk.section || 'Provision'}</span>
+                      <span className="text-slate-400">P. {chunk.page_number || 1}</span>
+                    </div>
                     <p className="text-slate-600 line-clamp-2 font-mono text-[10px]">
                       {chunk.content}
                     </p>
@@ -300,13 +307,29 @@ function AnalysisContent() {
             />
           )}
 
+          {/* Empty / Unreadable Document Error Banner */}
+          {!loadingAnalysis && selectedDoc && selectedDoc.status === 'failed' && (
+            <div className="p-6 bg-red-50 border border-red-200 text-red-900 rounded-xl shadow-sm space-y-3">
+              <div className="flex items-center space-x-2 font-bold text-sm text-red-900">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                <span>Document Text Extraction Failed</span>
+              </div>
+              <p className="text-xs font-semibold text-red-800 bg-red-100/80 p-3 rounded border border-red-200/80 font-mono">
+                "We couldn't extract readable text from this document."
+              </p>
+              <p className="text-xs text-red-700 leading-relaxed">
+                The uploaded file does not contain selectable text or is an unreadable image scan. To protect Gemini context quality, empty or unreadable documents are not sent to the AI pipeline.
+              </p>
+            </div>
+          )}
+
           {/* Extracted Chunks Status Banner if Analysis is Pending */}
-          {!loadingAnalysis && !analysis && selectedDoc && (
+          {!loadingAnalysis && !analysis && selectedDoc && selectedDoc.status !== 'failed' && (
             <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                 <div className="flex items-center space-x-2">
                   <BarChart3 className="w-5 h-5 text-blue-600" />
-                  <h2 className="text-base font-bold text-slate-900">Document Processed & Ready for AI Analysis</h2>
+                  <h2 className="text-base font-bold text-slate-900">Real Document Processed & Stored in Supabase</h2>
                 </div>
                 {getStatusBadge(selectedDoc.status)}
               </div>
@@ -314,21 +337,21 @@ function AnalysisContent() {
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs space-y-1.5">
                 <div className="flex items-center space-x-2 font-bold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Real Document Successfully Uploaded & Parsed</span>
+                  <span>Document Retracted from Supabase Storage & Chunked</span>
                 </div>
                 <p className="text-emerald-800">
-                  Document <strong className="font-semibold">{selectedDoc.name}</strong> was stored in Supabase Storage and parsed into <strong>{chunks.length} structured text chunks</strong> in database table <code className="font-mono bg-emerald-100 px-1 py-0.5 rounded">document_chunks</code>.
+                  Real document <strong className="font-semibold">{selectedDoc.name}</strong> was retrieved from Supabase Storage and parsed into <strong>{chunks.length} legal clause chunks</strong> in database table <code className="font-mono bg-emerald-100 px-1 py-0.5 rounded">document_chunks</code>.
                 </p>
               </div>
 
               <div className="pt-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Extracted Source Chunks Preview:</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Verified Database Chunks ({chunks.length}):</h3>
                 <div className="space-y-3">
                   {chunks.map((chunk) => (
                     <div key={chunk.id} className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
                       <div className="flex items-center justify-between mb-1.5 font-mono text-[11px]">
                         <span className="font-bold text-slate-800">Chunk #{chunk.chunk_index + 1}: {chunk.section}</span>
-                        <span className="text-slate-400">Page {chunk.page_number || 1}</span>
+                        <span className="text-slate-500 font-semibold">Page {chunk.page_number || 1}</span>
                       </div>
                       <p className="text-slate-700 font-mono text-[11px] leading-relaxed bg-white p-2.5 rounded border border-slate-200">
                         {chunk.content}
