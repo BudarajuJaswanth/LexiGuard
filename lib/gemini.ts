@@ -194,3 +194,123 @@ Generate a JSON object strictly following this structure:
 
   throw new Error(`Gemini API Analysis failed: ${lastError?.message || 'All Gemini model endpoints failed'}`);
 }
+
+/**
+ * Generate 768-dimensional vector embedding for text using Gemini embedding models
+ */
+export async function generateGeminiEmbedding(text: string): Promise<number[]> {
+  const genAI = getGeminiClient();
+  const modelNames = ['gemini-embedding-001', 'gemini-embedding-2', 'gemini-embedding-2-preview'];
+  let lastErr: Error | null = null;
+
+  for (const modelName of modelNames) {
+    try {
+      const embeddingModel = genAI.getGenerativeModel({ model: modelName });
+      const result = await embeddingModel.embedContent(text);
+      const values = result.embedding?.values;
+
+      if (values && values.length > 0) {
+        // Return 768-dim float vector for Supabase vector(768) column
+        return values.slice(0, 768);
+      }
+    } catch (err: any) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  throw new Error(`Failed to generate Gemini vector embedding: ${lastErr?.message || 'Embedding endpoints unavailable'}`);
+}
+
+export interface GroundedQAResult {
+  found: boolean;
+  answer: string;
+  sources: {
+    section: string;
+    page_number?: number | string;
+    excerpt: string;
+  }[];
+}
+
+/**
+ * Perform REAL Document-Grounded Q&A using Gemini GenAI
+ */
+export async function generateGroundedQAAnswer(
+  documentName: string,
+  question: string,
+  chunks: { content: string; section?: string; page_number?: number }[]
+): Promise<GroundedQAResult> {
+  const genAI = getGeminiClient();
+  const modelNames = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+
+  const contextBlock = chunks.map((c, idx) => 
+    `--- [CHUNK #${idx + 1} | SECTION: ${c.section || 'General'} | PAGE: ${c.page_number || 1}] ---\n${c.content}`
+  ).join('\n\n');
+
+  const qaPrompt = `
+[DOCUMENT NAME]: ${documentName}
+
+[RETRIEVED DOCUMENT CHUNKS]:
+${contextBlock}
+
+[USER QUESTION]:
+${question}
+
+Instructions:
+1. Answer the user's question using ONLY the provided document chunks above.
+2. If the answer is present in the document chunks, provide a clear, plain-language answer and cite the relevant section, page number, and verbatim excerpt.
+3. If the answer CANNOT be found in the provided document chunks, set "found" to false and set "answer" to EXACTLY:
+"I couldn't find this information in the uploaded document."
+4. Never invent clauses, page numbers, dates, obligations, or legal conclusions.
+
+Respond strictly in valid JSON matching this structure:
+{
+  "found": true,
+  "answer": "Clear grounded answer text...",
+  "sources": [
+    {
+      "section": "Section Name",
+      "page_number": "1",
+      "excerpt": "Verbatim quote from document text supporting the answer"
+    }
+  ]
+}
+`.trim();
+
+  let lastError: Error | null = null;
+  for (const modelName of modelNames) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+        },
+      });
+
+      const result = await model.generateContent(qaPrompt);
+      const responseText = result.response.text().trim();
+      const cleanJson = responseText
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/, '')
+        .replace(/\s*```$/, '')
+        .trim();
+
+      const parsed: GroundedQAResult = JSON.parse(cleanJson);
+
+      // Enforce strict unavailability text fallback if not found
+      if (!parsed.found || !parsed.answer) {
+        return {
+          found: false,
+          answer: "I couldn't find this information in the uploaded document.",
+          sources: [],
+        };
+      }
+
+      return parsed;
+    } catch (err: any) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  throw new Error(`Grounded Q&A Generation failed: ${lastError?.message || 'All Gemini model endpoints failed'}`);
+}

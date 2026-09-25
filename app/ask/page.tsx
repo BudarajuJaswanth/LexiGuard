@@ -6,7 +6,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Badge } from '@/components/Badge';
 import { LoadingState, ErrorState, EmptyState } from '@/components/StateHandlers';
-import { getDocuments, getQAMessages, createQAMessage } from '@/lib/supabase';
+import { getDocuments, getQAMessages } from '@/lib/supabase';
 import { LegalDocument, QAMessage } from '@/types';
 import { MessageSquare, Send, ShieldAlert, FileText, Loader2 } from 'lucide-react';
 
@@ -81,13 +81,24 @@ function QAContent() {
     setError(null);
 
     try {
-      const { data, error: insertErr } = await createQAMessage(selectedDocId, qText);
-      if (insertErr) throw insertErr;
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: selectedDocId,
+          question: qText,
+        }),
+      });
 
-      // Refresh QA list
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Q&A request failed.');
+      }
+
+      // Refresh QA list directly from Supabase
       await fetchQA(selectedDocId);
     } catch (err: any) {
-      setError(err instanceof Error ? err : new Error('Failed to record question in Supabase.'));
+      setError(err instanceof Error ? err : new Error('Failed to complete Gemini Q&A request.'));
     } finally {
       setSubmitting(false);
     }
@@ -210,13 +221,13 @@ function QAContent() {
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Saving...</span>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Generating Answer...</span>
                     </>
                   ) : (
                     <>
                       <Send className="w-4 h-4" />
-                      <span>Ask Question</span>
+                      <span>Ask AI</span>
                     </>
                   )}
                 </button>
@@ -233,67 +244,92 @@ function QAContent() {
             {loadingQA && (
               <LoadingState
                 message="Fetching Q&A thread from Supabase..."
-                subtext="Querying `qa_messages` table"
+                subtext="Querying `chat_messages` table via pgvector RAG"
               />
             )}
 
             {!loadingQA && messages.length === 0 && (
               <EmptyState
                 title="No questions asked yet for this document"
-                description="Type your question in the box above (e.g. 'What is the termination notice period?') and submit."
+                description="Type your question in the box above (e.g. 'What is the notice period?') and click Ask AI."
                 icon={MessageSquare}
               />
             )}
 
-            {!loadingQA && messages.map((msg) => (
-              <div key={msg.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
-                
-                {/* User Question */}
-                <div className="flex items-start space-x-3 pb-3 border-b border-slate-100">
-                  <div className="w-7 h-7 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                    Q
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">{msg.question}</p>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                      {new Date(msg.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
+            {!loadingQA && messages.map((msg) => {
+              const isNotFound = msg.answer?.includes("couldn't find") || msg.answer?.includes("not found");
 
-                {/* AI Response */}
-                <div className="flex items-start space-x-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                    AI
-                  </div>
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center space-x-2">
-                      <Badge type="DOCUMENT_GROUNDED" />
+              return (
+                <div key={msg.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+                  
+                  {/* User Question */}
+                  <div className="flex items-start space-x-3 pb-3 border-b border-slate-100">
+                    <div className="w-7 h-7 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                      Q
                     </div>
-
-                    <p className="text-xs text-slate-800 leading-relaxed font-sans">
-                      {msg.answer || 'Pending Gemini answer generation in backend pipeline. Recorded in Supabase database.'}
-                    </p>
-
-                    {/* Source Citations */}
-                    {msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
-                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          Source Attribution & Citations:
-                        </h4>
-                        {msg.citations.map((cite, cIdx) => (
-                          <div key={cIdx} className="p-2.5 bg-white rounded border border-slate-200 text-xs">
-                            <span className="font-bold text-blue-700 text-[11px] block">{cite.clause}</span>
-                            <p className="text-[11px] text-slate-600 italic font-mono mt-0.5">"{cite.text}"</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-slate-900">{msg.question}</p>
+                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        {new Date(msg.created_at).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-              </div>
-            ))}
+                  {/* AI Response */}
+                  <div className={`flex items-start space-x-3 p-4 rounded-xl border ${
+                    isNotFound 
+                      ? 'bg-amber-50/70 border-amber-200' 
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                      AI
+                    </div>
+                    <div className="space-y-3 flex-1">
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                        <Badge type="DOCUMENT_GROUNDED" />
+                        <Badge type="GENERATED_BY_GEMINI" />
+                      </div>
+
+                      <p className={`text-xs leading-relaxed font-sans ${
+                        isNotFound ? 'text-amber-900 font-medium' : 'text-slate-800'
+                      }`}>
+                        {msg.answer || 'Analyzing document chunks with Gemini GenAI...'}
+                      </p>
+
+                      {/* Source Citations */}
+                      {msg.citations && msg.citations.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                          <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center space-x-1.5">
+                            <FileText className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Sources from uploaded document ({msg.citations.length})</span>
+                          </h4>
+                          <div className="space-y-2">
+                            {msg.citations.map((cite: any, cIdx: number) => (
+                              <div key={cIdx} className="p-3 bg-white rounded-lg border border-slate-200 text-xs shadow-2xs space-y-1">
+                                <div className="flex items-center justify-between text-[11px] font-mono text-slate-700">
+                                  <span className="font-bold text-blue-700">{cite.section || cite.clause || 'Section'}</span>
+                                  {cite.page_number && (
+                                    <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px]">
+                                      Page {cite.page_number}
+                                    </span>
+                                  )}
+                                </div>
+                                {(cite.excerpt || cite.text) && (
+                                  <blockquote className="text-[11px] text-slate-600 italic font-mono border-l-2 border-blue-500 pl-2 py-0.5">
+                                    "{cite.excerpt || cite.text}"
+                                  </blockquote>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })}
           </div>
 
         </div>

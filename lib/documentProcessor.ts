@@ -270,15 +270,28 @@ export async function processStorageDocument(
       .update({ status: 'embedding', updated_at: new Date().toISOString() })
       .eq('id', documentId);
 
-    // Insert chunks into Supabase document_chunks table
-    const rowsToInsert = chunks.map(c => ({
-      document_id: documentId,
-      content: c.content,
-      chunk_index: c.chunk_index,
-      page_number: c.page_number,
-      section: c.section,
-      embedding: null, // Prepared for Gemini embeddings in GenAI phase
-    }));
+    // Generate real 768-dim vector embeddings for chunks using Gemini text-embedding-004
+    const { generateGeminiEmbedding } = require('@/lib/gemini');
+    
+    const rowsToInsert = await Promise.all(
+      chunks.map(async (c) => {
+        let embedding: number[] | null = null;
+        try {
+          embedding = await generateGeminiEmbedding(c.content);
+        } catch (e: any) {
+          console.warn(`Embedding generation warning for chunk #${c.chunk_index}: ${e.message}`);
+        }
+
+        return {
+          document_id: documentId,
+          content: c.content,
+          chunk_index: c.chunk_index,
+          page_number: c.page_number,
+          section: c.section,
+          embedding,
+        };
+      })
+    );
 
     // Delete pre-existing chunks if re-processing
     await adminSupabase
