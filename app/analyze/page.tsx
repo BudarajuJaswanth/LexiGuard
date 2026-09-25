@@ -23,7 +23,9 @@ import {
   Clock,
   Sparkles,
   Layers3,
-  AlertCircle
+  AlertCircle,
+  Play,
+  Loader2
 } from 'lucide-react';
 
 interface ExtractedChunkItem {
@@ -46,6 +48,7 @@ function AnalysisContent() {
   const [chunks, setChunks] = useState<ExtractedChunkItem[]>([]);
   const [loadingDocs, setLoadingDocs] = useState<boolean>(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
+  const [analyzingGemini, setAnalyzingGemini] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
   // Load all documents for dropdown selector
@@ -80,7 +83,7 @@ function AnalysisContent() {
       setLoadingAnalysis(true);
       setError(null);
       
-      // Fetch analysis
+      // Fetch stored analysis from Supabase
       const { data: analysisData, error: err } = await getAnalysisByDocumentId(selectedDocId);
       if (err) {
         setError(err);
@@ -112,6 +115,42 @@ function AnalysisContent() {
 
     loadAnalysisAndChunks();
   }, [selectedDocId, documents]);
+
+  // Trigger Real Google Gemini Analysis API call
+  const handleRunGeminiAnalysis = async () => {
+    if (!selectedDocId) return;
+
+    setAnalyzingGemini(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId: selectedDocId }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Gemini API analysis failed.');
+      }
+
+      setAnalysis(json.analysis);
+
+      // Refresh document details
+      const { data: updatedDocs } = await getDocuments();
+      if (updatedDocs) {
+        setDocuments(updatedDocs);
+        const match = updatedDocs.find(d => d.id === selectedDocId);
+        if (match) setSelectedDoc(match);
+      }
+    } catch (err: any) {
+      setError(err instanceof Error ? err : new Error('Failed to complete Gemini analysis'));
+    } finally {
+      setAnalyzingGemini(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -178,18 +217,10 @@ function AnalysisContent() {
       {/* Error State */}
       {error && (
         <ErrorState
-          title="Failed to fetch analysis record"
+          title="Gemini Analysis Request Error"
           error={error}
-          onRetry={() => {
-            if (selectedDocId) {
-              setLoadingAnalysis(true);
-              getAnalysisByDocumentId(selectedDocId).then(({ data, error: err }) => {
-                if (err) setError(err);
-                else setAnalysis(data);
-                setLoadingAnalysis(false);
-              });
-            }
-          }}
+          onRetry={handleRunGeminiAnalysis}
+          actionText="Retry Gemini Analysis"
         />
       )}
 
@@ -235,7 +266,26 @@ function AnalysisContent() {
                   </div>
                 </div>
 
+                {/* Gemini Trigger Button */}
                 <div className="pt-2 space-y-2">
+                  <button
+                    onClick={handleRunGeminiAnalysis}
+                    disabled={analyzingGemini || chunks.length === 0}
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold text-xs transition-colors flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50"
+                  >
+                    {analyzingGemini ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Running Gemini AI...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 fill-white" />
+                        <span>{analysis ? 'Re-run Gemini AI Analysis' : 'Run Gemini AI Analysis'}</span>
+                      </>
+                    )}
+                  </button>
+
                   <Link
                     href={`/ask?doc=${selectedDoc.id}`}
                     className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-xs transition-colors flex items-center justify-center space-x-1.5 shadow-sm"
@@ -300,72 +350,76 @@ function AnalysisContent() {
         <div className="lg:col-span-8 space-y-6">
 
           {/* Loading Analysis */}
-          {loadingAnalysis && (
+          {(loadingAnalysis || analyzingGemini) && (
             <LoadingState
-              message="Fetching analysis & chunks from Supabase..."
-              subtext="Reading document chunks and structured analysis records"
+              message={analyzingGemini ? "Calling Google Gemini API..." : "Fetching analysis from Supabase..."}
+              subtext={analyzingGemini ? "Generating structured plain-language summary, key facts, obligations, important clauses, review radar, and action checklist" : "Reading stored AI analysis records"}
             />
           )}
 
           {/* Empty / Unreadable Document Error Banner */}
-          {!loadingAnalysis && selectedDoc && selectedDoc.status === 'failed' && (
+          {!loadingAnalysis && !analyzingGemini && selectedDoc && selectedDoc.status === 'failed' && (
             <div className="p-6 bg-red-50 border border-red-200 text-red-900 rounded-xl shadow-sm space-y-3">
               <div className="flex items-center space-x-2 font-bold text-sm text-red-900">
                 <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
-                <span>Document Text Extraction Failed</span>
+                <span>Document Unreadable Error</span>
               </div>
               <p className="text-xs font-semibold text-red-800 bg-red-100/80 p-3 rounded border border-red-200/80 font-mono">
                 "We couldn't extract readable text from this document."
               </p>
               <p className="text-xs text-red-700 leading-relaxed">
-                The uploaded file does not contain selectable text or is an unreadable image scan. To protect Gemini context quality, empty or unreadable documents are not sent to the AI pipeline.
+                To protect Gemini API context quality, unreadable documents or empty files are not submitted to the AI pipeline.
               </p>
             </div>
           )}
 
-          {/* Extracted Chunks Status Banner if Analysis is Pending */}
-          {!loadingAnalysis && !analysis && selectedDoc && selectedDoc.status !== 'failed' && (
+          {/* Prompt to Run Gemini if Document is Chunked & Ready */}
+          {!loadingAnalysis && !analyzingGemini && !analysis && selectedDoc && selectedDoc.status !== 'failed' && (
             <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                 <div className="flex items-center space-x-2">
                   <BarChart3 className="w-5 h-5 text-blue-600" />
-                  <h2 className="text-base font-bold text-slate-900">Real Document Processed & Stored in Supabase</h2>
+                  <h2 className="text-base font-bold text-slate-900">Ready for Google Gemini AI Analysis</h2>
                 </div>
                 {getStatusBadge(selectedDoc.status)}
               </div>
 
-              <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs space-y-1.5">
+              <div className="p-4 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg text-xs space-y-2">
                 <div className="flex items-center space-x-2 font-bold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Document Retracted from Supabase Storage & Chunked</span>
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <span>Real Source Text Chunks Ready ({chunks.length} clauses)</span>
                 </div>
-                <p className="text-emerald-800">
-                  Real document <strong className="font-semibold">{selectedDoc.name}</strong> was retrieved from Supabase Storage and parsed into <strong>{chunks.length} legal clause chunks</strong> in database table <code className="font-mono bg-emerald-100 px-1 py-0.5 rounded">document_chunks</code>.
+                <p className="text-blue-800 leading-relaxed">
+                  Document <strong className="font-semibold">{selectedDoc.name}</strong> has been extracted and stored in Supabase. Click below to execute the real Google Gemini GenAI pipeline.
                 </p>
               </div>
 
               <div className="pt-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Verified Database Chunks ({chunks.length}):</h3>
-                <div className="space-y-3">
-                  {chunks.map((chunk) => (
-                    <div key={chunk.id} className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                      <div className="flex items-center justify-between mb-1.5 font-mono text-[11px]">
-                        <span className="font-bold text-slate-800">Chunk #{chunk.chunk_index + 1}: {chunk.section}</span>
-                        <span className="text-slate-500 font-semibold">Page {chunk.page_number || 1}</span>
-                      </div>
-                      <p className="text-slate-700 font-mono text-[11px] leading-relaxed bg-white p-2.5 rounded border border-slate-200">
-                        {chunk.content}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                <button
+                  onClick={handleRunGeminiAnalysis}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors flex items-center space-x-2"
+                >
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>Execute Real Google Gemini Analysis</span>
+                </button>
               </div>
             </div>
           )}
 
           {/* Structured Analysis View */}
-          {!loadingAnalysis && analysis && (
+          {!loadingAnalysis && !analyzingGemini && analysis && (
             <div className="space-y-6">
+
+              {/* Disclaimer Notice */}
+              <div className="p-3 bg-slate-900 text-slate-200 rounded-lg border border-slate-800 text-xs flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Badge type="AI_ANALYSIS" />
+                  <Badge type="GENERATED_BY_GEMINI" />
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  AI-generated informational assistance — not legal advice.
+                </span>
+              </div>
 
               {/* 1. AI Summary */}
               <section className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
@@ -427,7 +481,7 @@ function AnalysisContent() {
                           <span>{clause.title}</span>
                           {clause.page && (
                             <span className="text-[10px] font-mono font-normal text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">
-                              Section / Page {clause.page}
+                              Page {clause.page}
                             </span>
                           )}
                         </h3>
