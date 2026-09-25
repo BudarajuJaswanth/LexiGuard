@@ -52,11 +52,20 @@ export default function ComparisonPage() {
     setError(null);
 
     try {
-      const { data, error: err } = await getComparisonRecord(docAId, docBId);
-      if (err) throw err;
-      setComparison(data);
+      const res = await fetch('/api/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docAId, docBId }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Comparison API request failed.');
+      }
+
+      setComparison(json.comparison);
     } catch (err: any) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch comparison record from Supabase.'));
+      setError(err instanceof Error ? err : new Error('Failed to complete Gemini document comparison.'));
       setComparison(null);
     } finally {
       setComparing(false);
@@ -73,15 +82,18 @@ export default function ComparisonPage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Title */}
         <div className="bg-slate-900 text-white p-6 rounded-xl border border-slate-800 shadow-md mb-8">
-          <div className="flex items-center space-x-2 mb-1">
+          <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
             <Badge type="AI_COMPARISON" />
             <Badge type="GENERATED_BY_GEMINI" />
+            <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-purple-950 text-purple-300 border border-purple-800 rounded">
+              Compared using Gemini
+            </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            Compare Two Documents
+            Compare Documents
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Side-by-side analysis of clause variations, obligation differences, and questions to clarify for legal counsel.
+            AI-generated factual comparison — informational only. Objective side-by-side analysis of clause variations.
           </p>
         </div>
 
@@ -89,7 +101,7 @@ export default function ComparisonPage() {
         <div className="mb-6 p-3.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs flex items-start space-x-2.5">
           <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            <strong className="font-semibold text-amber-950 uppercase tracking-wide">Legal Notice:</strong> Document comparison highlights clause differences for informational navigation. It does not provide legal opinions on which contract version is legally superior or valid.
+            <strong className="font-semibold text-amber-950 uppercase tracking-wide">Legal Notice:</strong> LexiGuard describes objective factual differences between documents. It does not rank contract versions, declare winners, or provide legal advice.
           </p>
         </div>
 
@@ -168,7 +180,7 @@ export default function ComparisonPage() {
               className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors flex items-center space-x-2 disabled:opacity-50"
             >
               <GitCompare className="w-4 h-4" />
-              <span>Compare Documents</span>
+              <span>{comparing ? 'Comparing Documents with Gemini...' : 'Compare Documents'}</span>
             </button>
           </div>
         </div>
@@ -186,8 +198,8 @@ export default function ComparisonPage() {
         {/* Loading State */}
         {comparing && (
           <LoadingState
-            message="Comparing Document A vs Document B in Supabase..."
-            subtext="Aligning clause topics, liability variations, and clarification questions"
+            message="Executing real Gemini AI comparative analysis..."
+            subtext="Comparing parties, duration, notice periods, termination, confidentiality, liabilities, and obligations"
           />
         )}
 
@@ -195,7 +207,7 @@ export default function ComparisonPage() {
         {!comparing && !comparison && !error && (
           <EmptyState
             title="No Comparison Record Loaded"
-            description="Select Document A and Document B above, then click 'Compare Documents' to inspect side-by-side clause variations."
+            description="Select Document A and Document B above, then click 'Compare Documents' to run real Gemini AI comparative analysis."
             icon={GitCompare}
           />
         )}
@@ -204,62 +216,119 @@ export default function ComparisonPage() {
         {!comparing && comparison && (
           <div className="space-y-8">
 
+            {/* COMPARISON RESULTS Header Box */}
+            <div className="bg-slate-900 text-slate-100 rounded-xl border border-slate-800 p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-white tracking-tight uppercase">
+                  COMPARISON RESULTS
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  AI-generated factual comparison — informational only.
+                </p>
+              </div>
+              <div className="flex items-center space-x-2 flex-wrap">
+                <Badge type="AI_COMPARISON" />
+                <Badge type="GENERATED_BY_GEMINI" />
+                <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-purple-950 text-purple-300 border border-purple-800 rounded">
+                  Compared using Gemini
+                </span>
+              </div>
+            </div>
+
             {/* 1. Comparison Summary */}
             <section className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
                 <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                   <FileText className="w-4 h-4 text-indigo-600" />
-                  <span>Comparison Summary</span>
+                  <span>Summary</span>
                 </h2>
-                <Badge type="AI_COMPARISON" />
+                <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                  Factual Comparative Overview
+                </span>
               </div>
-              <p className="text-xs text-slate-700 leading-relaxed">
+              <p className="text-xs text-slate-700 leading-relaxed font-sans">
                 {comparison.summary}
               </p>
             </section>
 
-            {/* 2. Differences */}
-            <section className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-              <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2 pb-3 border-b border-slate-200 mb-4">
-                <Layers className="w-4 h-4 text-blue-600" />
-                <span>Differences & Clause Variations</span>
-              </h2>
+            {/* 2. Structured Differences Table */}
+            <section className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                  <Layers className="w-4 h-4 text-blue-600" />
+                  <span>Differences & Provision Comparison</span>
+                </h2>
+                <span className="text-[11px] text-slate-500 font-mono">
+                  {comparison.differences?.length || 0} categories analyzed
+                </span>
+              </div>
 
-              <div className="space-y-4">
-                {comparison.differences?.map((diff, idx) => (
-                  <div key={idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/60">
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center space-x-2">
-                      <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                      <span>Topic: {diff.topic}</span>
-                    </h3>
+              {/* Comparison Table */}
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider">
+                      <th className="p-3.5 border-b border-slate-800 w-36">Category</th>
+                      <th className="p-3.5 border-b border-slate-800 w-1/3">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="w-4 h-4 rounded bg-blue-600 text-white flex items-center justify-center text-[9px] font-bold">A</span>
+                          <span>Document A ({docA?.name || 'Doc A'})</span>
+                        </div>
+                      </th>
+                      <th className="p-3.5 border-b border-slate-800 w-1/3">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="w-4 h-4 rounded bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold">B</span>
+                          <span>Document B ({docB?.name || 'Doc B'})</span>
+                        </div>
+                      </th>
+                      <th className="p-3.5 border-b border-slate-800">Objective Explanation</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {comparison.differences?.map((diff, idx) => {
+                      const categoryName = diff.category || diff.topic || 'Provision';
+                      const textA = diff.documentA || diff.doc_a_clause || 'Not specified';
+                      const textB = diff.documentB || diff.doc_b_clause || 'Not specified';
+                      const explanation = diff.explanation || diff.impact || '';
+                      const sourceA = diff.sourceA;
+                      const sourceB = diff.sourceB;
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Doc A Provision */}
-                      <div className="p-3 bg-white rounded-lg border border-blue-200 text-xs">
-                        <span className="font-bold text-blue-800 text-[11px] block mb-1">
-                          Document A Provision ({docA?.name})
-                        </span>
-                        <blockquote className="font-mono text-[11px] text-slate-700 bg-blue-50/50 p-2 rounded border border-blue-100 italic">
-                          "{diff.doc_a_clause}"
-                        </blockquote>
-                      </div>
+                      return (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                          {/* Category */}
+                          <td className="p-3.5 align-top font-bold text-slate-900 bg-slate-50/80 border-r border-slate-200">
+                            <span className="capitalize block">{categoryName}</span>
+                          </td>
 
-                      {/* Doc B Provision */}
-                      <div className="p-3 bg-white rounded-lg border border-indigo-200 text-xs">
-                        <span className="font-bold text-indigo-800 text-[11px] block mb-1">
-                          Document B Provision ({docB?.name})
-                        </span>
-                        <blockquote className="font-mono text-[11px] text-slate-700 bg-indigo-50/50 p-2 rounded border border-indigo-100 italic">
-                          "{diff.doc_b_clause}"
-                        </blockquote>
-                      </div>
-                    </div>
+                          {/* Document A Provision */}
+                          <td className="p-3.5 align-top border-r border-slate-200 space-y-1.5">
+                            <p className="text-slate-800 leading-relaxed font-sans">{textA}</p>
+                            {sourceA && (
+                              <span className="text-[10px] font-mono text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded inline-block">
+                                {sourceA}
+                              </span>
+                            )}
+                          </td>
 
-                    <div className="mt-3 pt-2 border-t border-slate-200 text-xs text-slate-700">
-                      <strong className="text-slate-900 font-semibold">Practical Impact:</strong> {diff.impact}
-                    </div>
-                  </div>
-                ))}
+                          {/* Document B Provision */}
+                          <td className="p-3.5 align-top border-r border-slate-200 space-y-1.5">
+                            <p className="text-slate-800 leading-relaxed font-sans">{textB}</p>
+                            {sourceB && (
+                              <span className="text-[10px] font-mono text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded inline-block">
+                                {sourceB}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Objective Explanation */}
+                          <td className="p-3.5 align-top text-slate-700 leading-relaxed font-medium bg-amber-50/20">
+                            {explanation}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </section>
 

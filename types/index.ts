@@ -69,10 +69,17 @@ export interface AnalysisData {
 }
 
 export interface DifferenceItem {
-  topic: string;
-  doc_a_clause: string;
-  doc_b_clause: string;
-  impact: string;
+  category: string;
+  documentA: string;
+  documentB: string;
+  explanation: string;
+  sourceA?: string;
+  sourceB?: string;
+  // Legacy backward-compatibility aliases
+  topic?: string;
+  doc_a_clause?: string;
+  doc_b_clause?: string;
+  impact?: string;
 }
 
 export interface ComparisonData {

@@ -314,3 +314,115 @@ Respond strictly in valid JSON matching this structure:
 
   throw new Error(`Grounded Q&A Generation failed: ${lastError?.message || 'All Gemini model endpoints failed'}`);
 }
+
+export interface GeminiComparisonResult {
+  summary: string;
+  differences: {
+    category: string;
+    documentA: string;
+    documentB: string;
+    explanation: string;
+    sourceA: string;
+    sourceB: string;
+  }[];
+  questionsToClarify: string[];
+}
+
+/**
+ * Execute REAL AI-Powered Document Comparison using Google Gemini
+ */
+export async function compareLegalDocumentsWithGemini(
+  docAName: string,
+  docAText: string,
+  docBName: string,
+  docBText: string
+): Promise<GeminiComparisonResult> {
+  const genAI = getGeminiClient();
+  const modelNames = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+
+  const prompt = `
+[DOCUMENT A NAME]: ${docAName}
+[DOCUMENT A CONTENT]:
+${docAText}
+
+---------------------------------------------------
+
+[DOCUMENT B NAME]: ${docBName}
+[DOCUMENT B CONTENT]:
+${docBText}
+
+Instructions:
+Perform an objective, factual AI comparative analysis between Document A (${docAName}) and Document B (${docBName}).
+
+IMPORTANT COMPARISON RULES:
+1. Describe differences objectively and factually.
+2. DO NOT rank the documents.
+3. DO NOT determine which contract is better, safer, or superior.
+4. NEVER say: "Document A is safer", "Document B is better", or "Document A wins".
+5. Use neutral comparative phrasing, e.g. "Document A specifies 30 days, while Document B specifies 90 days."
+
+Evaluate the following categories for differences:
+- parties
+- duration
+- payment/compensation
+- notice period
+- probation
+- termination
+- confidentiality
+- intellectual property
+- non-compete/non-solicitation
+- dispute resolution
+- obligations
+- other significant differences
+
+Generate a strictly valid JSON response matching this schema:
+{
+  "summary": "High-level objective summary comparing Document A and Document B...",
+  "differences": [
+    {
+      "category": "notice period",
+      "documentA": "Requires 30 days prior written notice before termination.",
+      "documentB": "Requires 90 days written notice before termination.",
+      "explanation": "Document A specifies a 30-day notice period, while Document B specifies a 90-day notice period.",
+      "sourceA": "Section 8 — Termination (Page 2)",
+      "sourceB": "Section 12 — Termination (Page 4)"
+    }
+  ],
+  "questionsToClarify": [
+    "Targeted question 1 to ask legal counsel regarding notice period discrepancy",
+    "Targeted question 2 to ask legal counsel regarding indemnification scope"
+  ]
+}
+`.trim();
+
+  let lastError: Error | null = null;
+  for (const modelName of modelNames) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+        },
+      });
+
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text().trim();
+      const cleanJson = responseText
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/, '')
+        .replace(/\s*```$/, '')
+        .trim();
+
+      const parsed: GeminiComparisonResult = JSON.parse(cleanJson);
+      if (!parsed.summary || !Array.isArray(parsed.differences)) {
+        throw new Error('Gemini comparison JSON output missing required keys.');
+      }
+      return parsed;
+    } catch (err: any) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  throw new Error(`Gemini Document Comparison failed: ${lastError?.message || 'All Gemini model endpoints failed'}`);
+}

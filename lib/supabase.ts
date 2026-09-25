@@ -129,11 +129,60 @@ export async function getComparisonRecord(docAId: string, docBId: string): Promi
     const { data, error } = await supabase
       .from('comparisons')
       .select('*')
-      .or(`and(doc_a_id.eq.${docAId},doc_b_id.eq.${docBId}),and(doc_a_id.eq.${docBId},doc_a_id.eq.${docAId})`)
+      .or(`and(document_a_id.eq.${docAId},document_b_id.eq.${docBId}),and(document_a_id.eq.${docBId},document_b_id.eq.${docAId})`)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (error) return { data: null, error: new Error(error.message) };
-    return { data: data as ComparisonData | null, error: null };
+    if (error) {
+      // Fallback try doc_a_id / doc_b_id column names if schema varies
+      const { data: fallbackData } = await supabase
+        .from('comparisons')
+        .select('*')
+        .or(`and(doc_a_id.eq.${docAId},doc_b_id.eq.${docBId}),and(doc_a_id.eq.${docBId},doc_a_id.eq.${docAId})`)
+        .maybeSingle();
+      if (fallbackData) {
+        return {
+          data: {
+            id: fallbackData.id,
+            doc_a_id: fallbackData.doc_a_id || docAId,
+            doc_b_id: fallbackData.doc_b_id || docBId,
+            summary: fallbackData.summary,
+            differences: fallbackData.differences || [],
+            questions_to_clarify: fallbackData.questions_to_clarify || fallbackData.questions || [],
+            created_at: fallbackData.created_at,
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    }
+
+    if (!data) return { data: null, error: null };
+
+    return {
+      data: {
+        id: data.id,
+        doc_a_id: data.document_a_id || data.doc_a_id || docAId,
+        doc_b_id: data.document_b_id || data.doc_b_id || docBId,
+        summary: data.summary,
+        differences: (data.differences || []).map((d: any) => ({
+          category: d.category || d.topic || 'General Difference',
+          documentA: d.documentA || d.doc_a_clause || '',
+          documentB: d.documentB || d.doc_b_clause || '',
+          explanation: d.explanation || d.impact || '',
+          sourceA: d.sourceA || 'Document A',
+          sourceB: d.sourceB || 'Document B',
+          topic: d.topic || d.category,
+          doc_a_clause: d.doc_a_clause || d.documentA,
+          doc_b_clause: d.doc_b_clause || d.documentB,
+          impact: d.impact || d.explanation,
+        })),
+        questions_to_clarify: data.questions_to_clarify || data.questions || [],
+        created_at: data.created_at,
+      },
+      error: null,
+    };
   } catch (err: any) {
     return { data: null, error: err instanceof Error ? err : new Error('Failed to fetch comparison record') };
   }
